@@ -4,8 +4,7 @@ from bs4 import BeautifulSoup
 
 def get_text(girl_sign, man_sign):
     
-    dictionary = 
-    {
+    dictionary = {
         'овен': 'oven',
         'весы': 'vesy',
         'козерог': 'kozerog',
