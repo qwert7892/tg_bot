@@ -9,7 +9,7 @@ from aiogram.utils import executor
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 
 from database import Db
-from sigh import get_text
+from sign import get_text
 import config
 
 TOKEN = config.TOCKEN
@@ -222,8 +222,10 @@ async def seach_profile_step2(message: types.Message, state: FSMContext):
     db.set_city_search(str(user_data['search_profile_city']), str(message.from_user.id))
     profile_id = db.search_profile(user_data['search_profile_city'])
     need_profile = str(random.choice(profile_id))[1:-2]
+    while need_profile == str(message.from_user.id):
+        need_profile = str(random.choice(profile_id))[1:-2]
     profile_need = db.get_info(need_profile)
-    #await message.answer(db.get_info(need_profile))
+    # await message.answer(db.get_info(need_profile))
     await state.update_data(last_profile_id=profile_id)
 
     profile_name = profile_need[0][8]
@@ -260,7 +262,11 @@ async def seach_profile_step3(message: types.Message, state: FSMContext):
         await state.update_data(last_profile_id=profile_id)
         if not db.add_like_exists(str(message.from_user.id), str(user_data['last_profile_id'])):
             db.add_like(str(message.from_user.id), str(user_data['last_profile_id']))
+        person = str(random.choice(profile_id))[1:-2]
+
         need_profile = str(random.choice(profile_id))[1:-2]
+        while need_profile == str(message.from_user.id):
+            need_profile = str(random.choice(profile_id))[1:-2]
         profile_need = db.get_info(need_profile)
         profile_name = profile_need[0][8]
         profile_age = profile_need[0][6]
@@ -282,14 +288,15 @@ async def seach_profile_step3(message: types.Message, state: FSMContext):
 
         await state.update_data(last_profile_id=profile_id)
         texts = f'смотри, {self_profile_name}, {self_profile_age} \n {self_profile_desc}'
-        await bot.send_message(chat_id=(int(need_profile)), text=f'смотри, {self_profile_name}, {self_profile_age} '
-                                                                 f'\n {self_profile_desc}')
+        await bot.send_message(chat_id=(int(need_profile)), text=f'пали, {self_profile_name}, {self_profile_age} '
+                                                                 f'\n {self_profile_desc}, @{str(message.from_user.username)}')
         await state.finish()
-
     if str(message.text) == '👎':
         user_data = await state.get_data()
         profile_id = db.search_profile(user_data['search_profile_city'])
         need_profile = str(random.choice(profile_id))[1:-2]
+        while need_profile == str(message.from_user.id):
+            need_profile = str(random.choice(profile_id))[1:-2]
         profile_need = db.get_info(need_profile)
         profile_name = profile_need[0][7]
         profile_age = profile_need[0][6]
@@ -302,6 +309,13 @@ async def seach_profile_step3(message: types.Message, state: FSMContext):
                      f'\n {profile_desc}\n {profile_match}'
         await message.answer(text_reply)
         await message.answer_photo(photo_profile)
+
+
+@dp.message_handler(lambda message: message.text == 'Удалить анкету')
+async def delete_profile(message: types.Message):
+    db.delete(message.from_user.id)
+    await message.answer('Анкета успешно удалена!')
+    await bot_start(message)
 
 
 executor.start_polling(dp, skip_updates=True)
