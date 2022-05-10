@@ -92,6 +92,7 @@ async def make_profile(message: types.Message):
         await message.answer('У тебя уже есть анкета')
 
 
+# посмотреть как выглядит профиль
 @dp.message_handler(lambda message: message.text == 'Посмотреть свой профиль')
 async def show_profile(message: types.Message):
     if not db.profile_exists(message.from_user.id):
@@ -102,11 +103,11 @@ async def show_profile(message: types.Message):
         self_profile_desc = (db.get_info(str(message.from_user.id)))[0][2]
         self_profile_sign = (db.get_info(str(message.from_user.id)))[0][7]
         self_photo_profile = open(f'photo_user/{str(message.from_user.id)}.jpg', 'rb')
-        text = f'пали, {self_profile_name}, {self_profile_age}, {self_profile_sign}\n\n {self_profile_desc}'
+        text = f'сейчас твоя анкета выглядит так, {self_profile_name}, {self_profile_age}, {self_profile_sign}\n\n {self_profile_desc}'
         await message.answer_photo(self_photo_profile, caption=text)
 
 
-# обработаем имя
+# обработчик имени
 @dp.message_handler(state=Profile.name)
 async def insert_name(message: types.Message, state: FSMContext):
     if str(message.text) == 'Выйти':
@@ -121,7 +122,7 @@ async def insert_name(message: types.Message, state: FSMContext):
         return
 
 
-# инфо о челе
+# обработчик информации
 @dp.message_handler(state=Profile.description)
 async def insert_info(message: types.Message, state: FSMContext):
     if str(message.text) == 'Выйти':
@@ -137,7 +138,7 @@ async def insert_info(message: types.Message, state: FSMContext):
         return
 
 
-# возраст с проверкой на малолеток
+# обработчик возраста с проверкой на доступ к сервису
 @dp.message_handler(state=Profile.age)
 async def insert_age(message: types.Message, state: FSMContext):
     if str(message.text) == 'Выйти':
@@ -153,6 +154,7 @@ async def insert_age(message: types.Message, state: FSMContext):
         await Profile.next()
 
 
+# обработчик знака заодиака с проверкой на корректность ввода
 @dp.message_handler(state=Profile.sign)
 async def insert_sign(message: types.Message, state: FSMContext):
     dictionary = {
@@ -173,6 +175,7 @@ async def insert_sign(message: types.Message, state: FSMContext):
         await state.finish()
         await bot_start(message)
         return
+    # проверка на корректность ввода
     if str(message.text).lower() not in dictionary:
         await message.reply(random.choice(unright_signs))
     else:
@@ -181,6 +184,7 @@ async def insert_sign(message: types.Message, state: FSMContext):
         await Profile.next()
 
 
+# обработчик города
 @dp.message_handler(state=Profile.city)
 async def insert_city(message: types.Message, state: FSMContext):
     if str(message.text) == 'Выйти':
@@ -197,6 +201,7 @@ async def insert_city(message: types.Message, state: FSMContext):
         await Profile.next()
 
 
+# обработчик фотографии
 @dp.message_handler(state=Profile.photo, content_types=['photo'])
 async def insert_photo(message: types.Message, state: FSMContext):
     if str(message.text) == 'Выйти':
@@ -216,6 +221,7 @@ async def insert_photo(message: types.Message, state: FSMContext):
     await Profile.next()
 
 
+# обработчик пола
 @dp.message_handler(state=Profile.sex)
 async def insert_sex(message: types.Message, state: FSMContext):
     if str(message.text) == 'Выйти':
@@ -233,18 +239,20 @@ async def insert_sex(message: types.Message, state: FSMContext):
         await bot_start(message)
 
 
+# стейты для поиска людей
 class SP(StatesGroup):
     city_search = State()
     searching = State()
 
 
+# обработчик поиска людей
 @dp.message_handler(lambda message: message.text == 'Смотреть анкеты')
 async def search_profile(message: types.Message):
     try:
         if not db.profile_exists(message.from_user.id):
             await message.answer('У тебя нет анкеты, заполни её а потом приходи сюда!')
         else:
-            await message.answer('Выбери город для поиска человечка :)')
+            await message.answer('Выбери город для поиска')
             await SP.city_search.set()
     except Exception as e:
         await state.finish()
@@ -252,8 +260,9 @@ async def search_profile(message: types.Message):
         return
 
 
+# поиск людей и показ анкет
 @dp.message_handler(state=SP.city_search)
-async def seach_profile_step2(message: types.Message, state: FSMContext):
+async def seach_profile_next(message: types.Message, state: FSMContext):
     await state.update_data(search_profile_city=message.text.lower())
     user_data = await state.get_data()
     db.set_city_search(str(user_data['search_profile_city']), str(message.from_user.id))
@@ -262,61 +271,63 @@ async def seach_profile_step2(message: types.Message, state: FSMContext):
     while need_profile == str(message.from_user.id):
         need_profile = str(random.choice(profile_id))[1:-2]
     profile_need = db.get_info(need_profile)
-    # await message.answer(db.get_info(need_profile))
     await state.update_data(last_profile_id=profile_id)
 
+    # данные для показа чужой анкеты
     profile_name = profile_need[0][8]
     profile_age = profile_need[0][6]
     profile_desc = profile_need[0][2]
     profile_sign = profile_need[0][7]
     self_profile_sign = (db.get_info(str(message.from_user.id)))[0][7]
+    # расчет совместимости
     profile_match = get_text(profile_sign, self_profile_sign)
 
     # кнопки для оценки
     button_like = KeyboardButton('👍')
-
     button_dislike = KeyboardButton('👎')
-
     mark_menu = ReplyKeyboardMarkup()
-
     mark_menu.add(button_dislike, button_like)
 
+    # создание сообщения для отправки пользователю
     photo_profile = open(f'photo_user/{str(need_profile)}.jpg', 'rb')
-
     text_reply = f'смотри, {profile_name}, {profile_age} ' \
                  f'\n\n {profile_desc} \n\n {profile_match}'
 
-    await message.answer(text_reply)
-    await message.answer_photo(photo_profile, reply_markup=mark_menu)
+    await message.answer_photo(photo_profile, caption=text_reply, reply_markup=mark_menu)
     await SP.next()
 
 
 @dp.message_handler(state=SP.searching)
-async def seach_profile_step3(message: types.Message, state: FSMContext):
+async def seach_profile_last(message: types.Message, state: FSMContext):
+    # обработчик лайка
     if str(message.text) == '👍':
         user_data = await state.get_data()
         profile_id = db.search_profile(user_data['search_profile_city'])
         await state.update_data(last_profile_id=profile_id)
+        # добавление лайка
         if not db.add_like_exists(str(message.from_user.id), str(user_data['last_profile_id'])):
             db.add_like(str(message.from_user.id), str(user_data['last_profile_id']))
         person = str(random.choice(profile_id))[1:-2]
 
         need_profile = str(random.choice(profile_id))[1:-2]
+        # генерация профиля для показа
         while need_profile == str(message.from_user.id):
             need_profile = str(random.choice(profile_id))[1:-2]
+        # данные для показа чужой анкеты
         profile_need = db.get_info(need_profile)
         profile_name = profile_need[0][8]
         profile_age = profile_need[0][6]
         profile_desc = profile_need[0][2]
         profile_sign = profile_need[0][7]
         self_profile_sign = (db.get_info(str(message.from_user.id)))[0][7]
+        # расчет совместимости
         profile_match = get_text(profile_sign, self_profile_sign)
         photo_profile = open(f'photo_user/{str(need_profile)}.jpg', 'rb')
         text_reply = f'смотри, {profile_name}, {profile_age} ' \
                      f'\n\n {profile_desc}\n\n {profile_match}'
-        await message.answer(text_reply)
-        await message.answer_photo(photo_profile)
+        await message.answer_photo(photo_profile, caption=text_reply)
 
+        # отправка понравившемуся человеку своей анкеты
         self_profile_name = (db.get_info(str(message.from_user.id)))[0][8]
         self_profile_age = (db.get_info(str(message.from_user.id)))[0][6]
         self_profile_desc = (db.get_info(str(message.from_user.id)))[0][2]
@@ -326,9 +337,10 @@ async def seach_profile_step3(message: types.Message, state: FSMContext):
         await state.update_data(last_profile_id=profile_id)
         texts = f'смотри, {self_profile_name}, {self_profile_age} \n {self_profile_desc}'
         await bot.send_message(chat_id=(int(need_profile)),
-                               text=f'пали, {self_profile_name}, {self_profile_age} {self_profile_sign}' \
+                               text=f' Тобой кто-то заинтересовался, {self_profile_name}, {self_profile_age} {self_profile_sign}' \
                                     f'\n\n {self_profile_desc}' \
                                     f'\n\n {profile_match} @{str(message.from_user.username)}')
+
         await state.finish()
     if str(message.text) == '👎':
         user_data = await state.get_data()
@@ -350,6 +362,7 @@ async def seach_profile_step3(message: types.Message, state: FSMContext):
         await message.answer_photo(photo_profile)
 
 
+# хедлер для удаления анкеты
 @dp.message_handler(lambda message: message.text == 'Удалить анкету')
 async def delete_profile(message: types.Message):
     db.delete(message.from_user.id)
